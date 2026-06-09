@@ -16,3 +16,8 @@ Aplikacja została zaprojektowana zgodnie z zasadami programowania obiektowego (
 2. Program przechowuje historię rysunku w dynamicznej liście (ArrayList).
 3. Podczas odświeżania ekranu aplikacja używa polimorfizmu — automatycznie przelatuje przez listę obiektów i wywołuje uniwersalną metodę .draw(), dzięki czemu każdy kształt sam wie, jak poprawnie wyrenderować się na płótnie.
 Aplikacja cechuje się intuicyjnym interfejsem użytkownika (GUI) i stabilnym działaniem, łącząc prostotę obsługi z elastycznością kodu.
+
+Jak uruchomić?
+
+1. Skompiluj plik PocketPaint.java, PaintPanel.java, Shapes.java, Shape.java,  w dowolnym środowisku Java (np. IntelliJ IDEA).
+2. Uruchom program.
