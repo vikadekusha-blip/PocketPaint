@@ -1,0 +1,1088 @@
+Oto absolutnie cały tekst rozmowy wraz z kodem przetłumaczony na język polski:
+
+Ja: "Plik specyfikacji projektu"
+
+Napiszemy go?
+
+Gemini: O, ciekawy projekt! Nasz kieszonkowy Pocket Paint w Javie. Zadanie jest klasyczne i pisze się je łatwo, a przy tym w środku znajdzie się ładny OOP z polimorfizmem, dokładnie tak, jak wymaga specyfikacja.
+
+Zróbmy wszystko w Java Swing — to standardowa biblioteka, nie trzeba dociągać żadnych dodatkowych zależności, a do okienkowego GUI nadaje się idealnie.
+Podzielimy kod na logiczne części, żeby nie było chaosu. Stworzymy klasę abstrakcyjną Shape (bazowa figura), klasy pochodne, panel do rysowania oraz główne okno.
+
+Oto gotowy, działający kod. Możesz wrzucić go do jednego pliku PocketPaint.java i uruchomić.
+
+Kod programu PocketPaint.java
+
+Java
+
+Java
+import javax.swing.*;
+import java.awt.*;
+import java.awt.event.*;
+import java.util.ArrayList;
+import java.util.List;
+
+// ==========================================
+// 1. ARCHITEKTURA FIGUR (OOP: Hierarchia i Polimorfizm)
+// ==========================================
+
+// Klasa abstrakcyjna dla wszystkich figur
+abstract class Shape {
+    protected Color color;
+    protected int strokeWidth;
+
+    public Shape(Color color, int strokeWidth) {
+        this.color = color;
+        this.strokeWidth = strokeWidth;
+    }
+
+    // Każda figura sama wie, jak się narysować
+    public abstract void draw(Graphics2D g2d);
+}
+
+// Linia (do swobodnego rysowania i linii prostych)
+class LineShape extends Shape {
+    private int x1, y1, x2, y2;
+
+    public LineShape(int x1, int y1, int x2, int y2, Color color, int strokeWidth) {
+        super(color, strokeWidth);
+        this.x1 = x1;
+        this.y1 = y1;
+        this.x2 = x2;
+        this.y2 = y2;
+    }
+
+    @Override
+    public void draw(Graphics2D g2d) {
+        g2d.setColor(color);
+        g2d.setStroke(new BasicStroke(strokeWidth, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+        g2d.drawLine(x1, y1, x2, y2);
+    }
+}
+
+// Prostokąt
+class RectangleShape extends Shape {
+    private int x, y, width, height;
+
+    public RectangleShape(int x1, int y1, int x2, int y2, Color color, int strokeWidth) {
+        super(color, strokeWidth);
+        this.x = Math.min(x1, x2);
+        this.y = Math.min(y1, y2);
+        this.width = Math.abs(x1 - x2);
+        this.height = Math.abs(y1 - y2);
+    }
+
+    @Override
+    public void draw(Graphics2D g2d) {
+        g2d.setColor(color);
+        g2d.setStroke(new BasicStroke(strokeWidth));
+        g2d.drawRect(x, y, width, height);
+    }
+}
+
+// Owal / Koło
+class OvalShape extends Shape {
+    private int x, y, width, height;
+
+    public OvalShape(int x1, int y1, int x2, int y2, Color color, int strokeWidth) {
+        super(color, strokeWidth);
+        this.x = Math.min(x1, x2);
+        this.y = Math.min(y1, y2);
+        this.width = Math.abs(x1 - x2);
+        this.height = Math.abs(y1 - y2);
+    }
+
+    @Override
+    public void draw(Graphics2D g2d) {
+        g2d.setColor(color);
+        g2d.setStroke(new BasicStroke(strokeWidth));
+        g2d.drawOval(x, y, width, height);
+    }
+}
+
+// ==========================================
+// 2. PŁÓTNO DO RYSOWANIA (Paint Panel)
+// ==========================================
+class PaintPanel extends JPanel {
+    private List<Shape> shapes = new ArrayList<>(); // Historia figur (Undo / Lista)
+    
+    // Aktualne ustawienia pędzla
+    private String currentTool = "Brush"; // Brush, Line, Rect, Oval, Eraser
+    private Color currentColor = Color.BLACK;
+    private int currentStroke = 5;
+
+    // Współrzędne myszy do śledzenia
+    private int lastX, lastY;
+    private int startX, startY;
+    private Shape previewShape = null; // Do wyświetlania figury w trakcie rozciągania
+
+    public PaintPanel() {
+        setBackground(Color.WHITE);
+
+        // Obsługa kliknięć i naciśnięć myszy
+        addMouseListener(new MouseAdapter() {
+            @Override
+            public void mousePressed(MouseEvent e) {
+                startX = e.getX();
+                startY = e.getY();
+                lastX = startX;
+                lastY = startY;
+            }
+
+            @Override
+            public void mouseReleased(MouseEvent e) {
+                // Kiedy puszczamy mysz — ostatecznie dodajemy figurę do historii
+                if (previewShape != null) {
+                    shapes.add(previewShape);
+                    previewShape = null;
+                    repaint();
+                }
+            }
+        });
+
+        // Obsługa ruchu myszy z wciśniętym przyciskiem
+        addMouseMotionListener(new MouseMotionAdapter() {
+            @Override
+            public void mouseDragged(MouseEvent e) {
+                int currentX = e.getX();
+                int currentY = e.getY();
+
+                Color activeColor = currentTool.equals("Eraser") ? Color.WHITE : currentColor;
+
+                switch (currentTool) {
+                    case "Brush":
+                    case "Eraser":
+                        // Swobodne rysowanie — to mnóstwo małych połączonych linii
+                        shapes.add(new LineShape(lastX, lastY, currentX, currentY, activeColor, currentStroke));
+                        lastX = currentX;
+                        lastY = currentY;
+                        break;
+                    case "Line":
+                        previewShape = new LineShape(startX, startY, currentX, currentY, activeColor, currentStroke);
+                        break;
+                    case "Rect":
+                        previewShape = new RectangleShape(startX, startY, currentX, currentY, activeColor, currentStroke);
+                        break;
+                    case "Oval":
+                        previewShape = new OvalShape(startX, startY, currentX, currentY, activeColor, currentStroke);
+                        break;
+                }
+                repaint(); // Przerysowujemy płótno
+            }
+        });
+    }
+
+    @Override
+    protected void paintComponent(Graphics g) {
+        super.paintComponent(g);
+        Graphics2D g2d = (Graphics2D) g;
+        
+        // Włączamy wygładzanie, aby linie nie były pikselowymi kostkami
+        g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+        // Rysujemy wszystkie zapisane figury (Polimorfizm w działaniu)
+        for (Shape shape : shapes) {
+            shape.draw(g2d);
+        }
+
+        // Rysujemy figurę, którą w tym momencie rozciągamy myszką
+        if (previewShape != null) {
+            previewShape.draw(g2d);
+        }
+    }
+
+    // Metody sterowania dla panelu narzędzi
+    public void setTool(String tool) { this.currentTool = tool; }
+    public void setColor(Color color) { this.currentColor = color; }
+    public void setStroke(int stroke) { this.currentStroke = stroke; }
+
+    public void clearCanvas() {
+        shapes.clear();
+        previewShape = null;
+        repaint();
+    }
+
+    public void undo() {
+        if (!shapes.isEmpty()) {
+            shapes.remove(shapes.size() - 1);
+            repaint();
+        }
+    }
+}
+
+// ==========================================
+// 3. GŁÓWNE OKNO APLIKACJI (GUI)
+// ==========================================
+public class PocketPaint extends JFrame {
+    private PaintPanel paintPanel;
+
+    public PocketPaint() {
+        setTitle("Pocket Paint");
+        setSize(900, 600);
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setLocationRelativeTo(null);
+
+        paintPanel = new PaintPanel();
+        add(paintPanel, BorderLayout.CENTER);
+
+        // Tworzymy panel sterowania na górze
+        JPanel controlPanel = new JPanel();
+        controlPanel.setLayout(new FlowLayout(FlowLayout.LEFT, 10, 10));
+        controlPanel.setBackground(new Color(240, 240, 240));
+
+        // Wybór narzędzi
+        String[] tools = {"Brush", "Line", "Rect", "Oval", "Eraser"};
+        JComboBox<String> toolBox = new JComboBox<>(tools);
+        toolBox.addActionListener(e -> paintPanel.setTool((String) toolBox.getSelectedItem()));
+        controlPanel.add(new JLabel("Narzędzie:"));
+        controlPanel.add(toolBox);
+
+        // Grubość linii (Suwak)
+        JSlider strokeSlider = new JSlider(1, 30, 5);
+        strokeSlider.addChangeListener(e -> paintPanel.setStroke(strokeSlider.getValue()));
+        controlPanel.add(new JLabel("Rozmiar:"));
+        controlPanel.add(strokeSlider);
+
+        // Wybór koloru
+        JButton colorBtn = new JButton(" Wybierz Kolor ");
+        colorBtn.setBackground(Color.BLACK);
+        colorBtn.setForeground(Color.WHITE);
+        colorBtn.addActionListener(e -> {
+            Color selected = JColorChooser.showDialog(this, "Wybierz Kolor Pędzla", Color.BLACK);
+            if (selected != null) {
+                paintPanel.setColor(selected);
+                colorBtn.setBackground(selected);
+                // Zmieniamy kolor tekstu na przycisku dla czytelności
+                double luminance = (0.299 * selected.getRed() + 0.587 * selected.getGreen() + 0.114 * selected.getBlue()) / 255;
+                colorBtn.setForeground(luminance > 0.5 ? Color.BLACK : Color.WHITE);
+            }
+        });
+        controlPanel.add(colorBtn);
+
+        // Przycisk Undo (Cofnij)
+        JButton undoBtn = new JButton("Cofnij (Ctrl+Z)");
+        undoBtn.addActionListener(e -> paintPanel.undo());
+        controlPanel.add(undoBtn);
+
+        // Przycisk Clear (Wyczyść)
+        JButton clearBtn = new JButton("Wyczyść");
+        clearBtn.addActionListener(e -> paintPanel.clearCanvas());
+        controlPanel.add(clearBtn);
+
+        add(controlPanel, BorderLayout.NORTH);
+
+        // Dodajemy skrót klawiszowy Ctrl+Z dla Undo
+        paintPanel.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).put(
+                KeyStroke.getKeyStroke(KeyEvent.VK_Z, InputEvent.CTRL_DOWN_MASK), "undoAction"
+        );
+        paintPanel.getActionMap().put("undoAction", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                paintPanel.undo();
+            }
+        });
+    }
+
+    public static void main(String[] args) {
+        // Uruchomienie interfejsu w bezpiecznym wątku Swing
+        SwingUtilities.invokeLater(() -> {
+            new PocketPaint().setVisible(true);
+        });
+    }
+}
+Co zostało zrobione:
+
+GUI i Okna: Użyto JFrame, aplikacja otwiera się w wygodnym trybie okienkowym, płótno jest wypełnione na biało.
+
+OOP na maksimum: * Istnieje bazowa abstrakcja Shape.
+
+Klasy LineShape, RectangleShape, OvalShape enkapsulują w sobie swoje współrzędne i logikę.
+
+Polimorfizm: W metodzie paintComponent po prostu przechodzimy przez listę pętlą i wywołujemy metodę .draw(g2d) — Swing sam wie, jak wyrenderować konkretną figurę.
+
+Narzędzia (Funkcje): * Swobodny pędzel (Brush) poprzez śledzenie przeciągania myszy (Mouse Dragged).
+
+Geometria (Linie, prostokąty, owale).
+
+Gumka (Eraser), która dokładnie wymazuje kolorem tła.
+
+Suwak zmiany rozmiaru pędzla/linii.
+
+Pełnoprawna systemowa paleta JColorChooser pod przyciskiem.
+
+Zarządzanie sesją:
+
+Przycisk Wyczyść (Clear) całkowicie resetuje listę i przerysowuje ekran na nieskazitelną biel.
+
+Funkcja Undo (Ctrl+Z) działa zarówno przez przycisk w menu, jak i klasyczny skrót klawiszowy na klawiaturze, usuwając ostatni element z dynamicznej listy ArrayList.
+
+Sprawdź, kod jest czysty, bez zbędnych bibliotek i uruchamia się jednym kliknięciem. Jeśli trzeba będzie coś poprawić lub dodać — mów, szybko dotworzymy!
+
+Ja: To wszystko ma być w jednej klasie czy w różnych?
+
+Gemini: W kodzie, który podesłałem wyżej, wszystko jest napisane w jednym pliku o nazwie PocketPaint.java.
+
+Wewnątrz tego pliku jedna klasa jest główna i publiczna (public class PocketPaint), a pozostałe to klasy pomocnicze (są napisane bez słowa kluczowego public). W Javie można tak robić: kompilator wszystko bez problemu przyjmie, a uruchamianie takiego programu jest maksymalnie wygodne — nie musisz tworzyć miliona plików.
+
+Jeśli jednak oddajesz ten projekt na uczelnię albo po prostu chcesz zrobić wszystko jak najbardziej profesjonalnie i „jak książka pisze”, to zgodnie z dobrymi praktykami OOP architekturę lepiej podzielić na osobne pliki.
+
+Oto jak powinno to wyglądać, jeśli rozbijemy kod na osobne pliki w jednym folderze (pakiecie):
+
+Jak podzielić kod na osobne pliki:
+
+Musisz utworzyć 4 osobne pliki w swoim środowisku programistycznym (np. IntelliJ IDEA, Eclipse lub VS Code) i wkleić do nich odpowiedni kod:
+
+Plik Shape.java
+
+Tutaj będzie znajdować się nasza abstrakcyjna baza dla wszystkich figur.
+
+Java
+
+Java
+import java.awt.*;
+
+public abstract class Shape {
+    protected Color color;
+    protected int strokeWidth;
+
+    public Shape(Color color, int strokeWidth) {
+        this.color = color;
+        this.strokeWidth = strokeWidth;
+    }
+
+    public abstract void draw(Graphics2D g2d);
+}
+Plik Shapes.java
+
+Żeby nie tworzyć trzech małych plików dla każdej figury, można je połączyć w jeden plik z implementacjami konkretnych klas (linia, prostokąt, owal).
+
+Java
+
+Java
+import java.awt.*;
+
+// Linia
+class LineShape extends Shape {
+    private int x1, y1, x2, y2;
+
+    public LineShape(int x1, int y1, int x2, int y2, Color color, int strokeWidth) {
+        super(color, strokeWidth);
+        this.x1 = x1; this.y1 = y1; this.x2 = x2; this.y2 = y2;
+    }
+
+    @Override
+    public void draw(Graphics2D g2d) {
+        g2d.setColor(color);
+        g2d.setStroke(new BasicStroke(strokeWidth, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+        g2d.drawLine(x1, y1, x2, y2);
+    }
+}
+
+// Prostokąt
+class RectangleShape extends Shape {
+    private int x, y, width, height;
+
+    public RectangleShape(int x1, int y1, int x2, int y2, Color color, int strokeWidth) {
+        super(color, strokeWidth);
+        this.x = Math.min(x1, x2);
+        this.y = Math.min(y1, y2);
+        this.width = Math.abs(x1 - x2);
+        this.height = Math.abs(y1 - y2);
+    }
+
+    @Override
+    public void draw(Graphics2D g2d) {
+        g2d.setColor(color);
+        g2d.setStroke(new BasicStroke(strokeWidth));
+        g2d.drawRect(x, y, width, height);
+    }
+}
+
+// Owal / Koło
+class OvalShape extends Shape {
+    private int x, y, width, height;
+
+    public OvalShape(int x1, int y1, int x2, int y2, Color color, int strokeWidth) {
+        super(color, strokeWidth);
+        this.x = Math.min(x1, x2);
+        this.y = Math.min(y1, y2);
+        this.width = Math.abs(x1 - x2);
+        this.height = Math.abs(y1 - y2);
+    }
+
+    @Override
+    public void draw(Graphics2D g2d) {
+        g2d.setColor(color);
+        g2d.setStroke(new BasicStroke(strokeWidth));
+        g2d.drawOval(x, y, width, height);
+    }
+}
+Plik PaintPanel.java
+
+To nasze płótno, które nasłuchuje myszkę i przechowuje historię rysunku.
+
+Java
+
+Java
+import javax.swing.*;
+import java.awt.*;
+import java.awt.event.*;
+import java.util.ArrayList;
+import java.util.List;
+
+public class PaintPanel extends JPanel {
+    private List<Shape> shapes = new ArrayList<>(); 
+    private String currentTool = "Brush"; 
+    private Color currentColor = Color.BLACK;
+    private int currentStroke = 5;
+
+    private int lastX, lastY;
+    private int startX, startY;
+    private Shape previewShape = null; 
+
+    public PaintPanel() {
+        setBackground(Color.WHITE);
+
+        addMouseListener(new MouseAdapter() {
+            @Override
+            public void mousePressed(MouseEvent e) {
+                startX = e.getX(); startY = e.getY();
+                lastX = startX; lastY = startY;
+            }
+
+            @Override
+            public void mouseReleased(MouseEvent e) {
+                if (previewShape != null) {
+                    shapes.add(previewShape);
+                    previewShape = null;
+                    repaint();
+                }
+            }
+        });
+
+        addMouseMotionListener(new MouseMotionAdapter() {
+            @Override
+            public void mouseDragged(MouseEvent e) {
+                int currentX = e.getX();
+                int currentY = e.getY();
+                Color activeColor = currentTool.equals("Eraser") ? Color.WHITE : currentColor;
+
+                switch (currentTool) {
+                    case "Brush":
+                    case "Eraser":
+                        shapes.add(new LineShape(lastX, lastY, currentX, currentY, activeColor, currentStroke));
+                        lastX = currentX; lastY = currentY;
+                        break;
+                    case "Line":
+                        previewShape = new LineShape(startX, startY, currentX, currentY, activeColor, currentStroke);
+                        break;
+                    case "Rect":
+                        previewShape = new RectangleShape(startX, startY, currentX, currentY, activeColor, currentStroke);
+                        break;
+                    case "Oval":
+                        previewShape = new OvalShape(startX, startY, currentX, currentY, activeColor, currentStroke);
+                        break;
+                }
+                repaint();
+            }
+        });
+    }
+
+    @Override
+    protected void paintComponent(Graphics g) {
+        super.paintComponent(g);
+        Graphics2D g2d = (Graphics2D) g;
+        g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+        for (Shape shape : shapes) {
+            shape.draw(g2d);
+        }
+
+        if (previewShape != null) {
+            previewShape.draw(g2d);
+        }
+    }
+
+    public void setTool(String tool) { this.currentTool = tool; }
+    public void setColor(Color color) { this.currentColor = color; }
+    public void setStroke(int stroke) { this.currentStroke = stroke; }
+
+    public void clearCanvas() {
+        shapes.clear();
+        previewShape = null;
+        repaint();
+    }
+
+    public void undo() {
+        if (!shapes.isEmpty()) {
+            shapes.remove(shapes.size() - 1);
+            repaint();
+        }
+    }
+}
+Plik PocketPaint.java
+
+Główne okno aplikacji, gdzie składa się cały interfejs (przyciski, suwaki) i znajduje się punkt wejścia main.
+
+Java
+
+Java
+import javax.swing.*;
+import java.awt.*;
+import java.awt.event.*;
+
+public class PocketPaint extends JFrame {
+    private PaintPanel paintPanel;
+
+    public PocketPaint() {
+        setTitle("Pocket Paint");
+        setSize(900, 600);
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setLocationRelativeTo(null);
+
+        paintPanel = new PaintPanel();
+        add(paintPanel, BorderLayout.CENTER);
+
+        JPanel controlPanel = new JPanel();
+        controlPanel.setLayout(new FlowLayout(FlowLayout.LEFT, 10, 10));
+        controlPanel.setBackground(new Color(240, 240, 240));
+
+        String[] tools = {"Brush", "Line", "Rect", "Oval", "Eraser"};
+        JComboBox<String> toolBox = new JComboBox<>(tools);
+        toolBox.addActionListener(e -> paintPanel.setTool((String) toolBox.getSelectedItem()));
+        controlPanel.add(new JLabel("Narzędzie:"));
+        controlPanel.add(toolBox);
+
+        JSlider strokeSlider = new JSlider(1, 30, 5);
+        strokeSlider.addChangeListener(e -> paintPanel.setStroke(strokeSlider.getValue()));
+        controlPanel.add(new JLabel("Rozmiar:"));
+        controlPanel.add(strokeSlider);
+
+        JButton colorBtn = new JButton(" Wybierz Kolor ");
+        colorBtn.setBackground(Color.BLACK);
+        colorBtn.setForeground(Color.WHITE);
+        colorBtn.addActionListener(e -> {
+            Color selected = JColorChooser.showDialog(this, "Wybierz Kolor Pędzla", Color.BLACK);
+            if (selected != null) {
+                paintPanel.setColor(selected);
+                colorBtn.setBackground(selected);
+                double luminance = (0.299 * selected.getRed() + 0.587 * selected.getGreen() + 0.114 * selected.getBlue()) / 255;
+                colorBtn.setForeground(luminance > 0.5 ? Color.BLACK : Color.WHITE);
+            }
+        });
+        controlPanel.add(colorBtn);
+
+        JButton undoBtn = new JButton("Cofnij (Ctrl+Z)");
+        undoBtn.addActionListener(e -> paintPanel.undo());
+        controlPanel.add(undoBtn);
+
+        JButton clearBtn = new JButton("Wyczyść");
+        clearBtn.addActionListener(e -> paintPanel.clearCanvas());
+        controlPanel.add(clearBtn);
+
+        add(controlPanel, BorderLayout.NORTH);
+
+        paintPanel.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).put(
+                KeyStroke.getKeyStroke(KeyEvent.VK_Z, InputEvent.CTRL_DOWN_MASK), "undoAction"
+        );
+        paintPanel.getActionMap().put("undoAction", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                paintPanel.undo();
+            }
+        });
+    }
+
+    public static void main(String[] args) {
+        SwingUtilities.invokeLater(() -> {
+            new PocketPaint().setVisible(true);
+        });
+    }
+}
+Jak wygodniej dla Ciebie to zostawić?
+
+Ja: Miałam na myśli, jak lepiej napisać w programie, żeby wszystko działało? Przez różne klasy czy wszystko w jednej klasie Java?
+
+Gemini: Słuchaj, jeśli spojrzymy na to czysto technicznie — działać będzie w 100% identycznie w obu przypadkach. Javie jest zupełnie obojętne, czy rozrzucisz kod po różnych plikach, czy wrzucisz wszystko do jednego pliku. Program skompiluje się i uruchomi w obu sytuacjach.
+
+Ale jeśli rozmawiamy o tym, jak jest lepiej i poprawniej dla projektu, to odpowiedź jest jednoznaczna: lepiej pisać przez osobne klasy (w osobnych plikach).
+
+I oto dlaczego to najlepsza opcja, szczególnie pod Twoją specyfikację:
+
+Czystość kodu przed wykładowcą (OOP na maksa): W wymaganiach projektu masz wyraźnie napisane o użyciu zaawansowanych mechanizmów OOP (dziedziczenie, polimorfizm, enkapsulacja). Kiedy sprawdzający otworzy projekt i zobaczy estetyczną strukturę, gdzie każda klasa odpowiada za swoje zadanie (jeden plik — jedna figura, inny — płótno), od razu jest to dobry wskaźnik. Kod w jednym pliku często nazywa się „kodem spaghetti”, bo ciężko się w nim zorientować.
+
+Wygodne czytanie i modyfikacja: Wyobraź sobie, że chcesz dodać nową figurę (np. trójkąt). Jeśli masz wszystko w jednym pliku, będziesz musiała przewijać setki linii kodu i wcinać się w czyjąś logikę. W opcji z podziałem po prostu tworzysz plik TriangleShape.java, piszesz co trzeba i o nic się nie martwisz.
+
+Łatwiejsze szukanie błędów: Jeśli popsuje się logika rysowania na płótnie — od razu idziesz do PaintPanel.java. Jeśli błąd jest w interfejsie lub przyciskach — zaglądasz do PocketPaint.java. Wszystko jest odizolowane.
+
+Jak to ułożyć w środowisku programistycznym (IntelliJ IDEA / Eclipse):
+
+Po prostu stwórz w swoim folderze projektowym (wewnątrz folderu src) 4 osobne pliki z rozszerzeniem .java i skopiuj tam fragmenty kodu z mojej poprzedniej odpowiedzi:
+
+Shape.java (tutaj będzie public abstract class Shape)
+
+Shapes.java (tutaj wrzuć implementacje klas dla linii, prostokątów i owali)
+
+PaintPanel.java (nasze płótno do obsługi myszki)
+
+PocketPaint.java (główne okno z przyciskami i punktem startowym main)
+
+Projekt będziesz uruchamiać przez główny plik — PocketPaint.java.
+
+Więc moja rada: nie leń się, zrób to przez osobne pliki. Zajmie to dwie minuty dłużej (kwestia kliknięcia „Stwórz plik”), za to projekt będzie wyglądał profesjonalnie i zgodnie ze wszystkimi kanonami OOP!
+
+Ja: Napisz mi w takim razie ten kod, tylko z podziałem na klasy.
+
+Gemini: Mówisz — masz! Wyłóżmy wszystko na półki.
+
+Stwórz w swoim folderze z kodem źródłowym (zazwyczaj jest to folder src) 4 osobne pliki i skopiuj do każdego z nich odpowiedni fragment kodu.
+
+Plik Shape.java
+
+To nasz fundament — klasa abstrakcyjna, z której dziedziczą wszystkie pozostałe figury.
+
+Java
+
+Java
+import java.awt.*;
+
+// Klasa abstrakcyjna dla wszystkich figur (OOP: Enkapsulacja)
+public abstract class Shape {
+    protected Color color;
+    protected int strokeWidth;
+
+    public Shape(Color color, int strokeWidth) {
+        this.color = color;
+        this.strokeWidth = strokeWidth;
+    }
+
+    // Każda figura będzie nadpisywać tę metodę pod siebie (OOP: Polimorfizm)
+    public abstract void draw(Graphics2D g2d);
+}
+Plik Shapes.java
+
+Żeby ne tworzyć miliona plików dla 10 linii kodu, możemy połączyć wszystkie konkretne figury (klasy pochodne) w tym jednym pliku. Ważne — te klasy nie powinny mieć słowa public przed class, ponieważ w jednym pliku może być tylko jedna klasa publiczna.
+
+Java
+
+Java
+import java.awt.*;
+
+// Linia do swobodnego rysowania i linii prostych (OOP: Dziedziczenie)
+class LineShape extends Shape {
+    private int x1, y1, x2, y2;
+
+    public LineShape(int x1, int y1, int x2, int y2, Color color, int strokeWidth) {
+        super(color, strokeWidth);
+        this.x1 = x1;
+        this.y1 = y1;
+        this.x2 = x2;
+        this.y2 = y2;
+    }
+
+    @Override
+    public void draw(Graphics2D g2d) {
+        g2d.setColor(color);
+        // Zaokrąglamy końce linii, aby pędzel rysował płynnie, bez poszarpanych krawędzi
+        g2d.setStroke(new BasicStroke(strokeWidth, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+        g2d.drawLine(x1, y1, x2, y2);
+    }
+}
+
+// Prostokąt (OOP: Dziedziczenie)
+class RectangleShape extends Shape {
+    private int x, y, width, height;
+
+    public RectangleShape(int x1, int y1, int x2, int y2, Color color, int strokeWidth) {
+        super(color, strokeWidth);
+        // Math.min i Math.abs są potrzebne, aby figura rysowała się poprawnie w każdą stronę przeciągania myszy
+        this.x = Math.min(x1, x2);
+        this.y = Math.min(y1, y2);
+        this.width = Math.abs(x1 - x2);
+        this.height = Math.abs(y1 - y2);
+    }
+
+    @Override
+    public void draw(Graphics2D g2d) {
+        g2d.setColor(color);
+        g2d.setStroke(new BasicStroke(strokeWidth));
+        g2d.drawRect(x, y, width, height);
+    }
+}
+
+// Owal / Koło (OOP: Dziedziczenie) 
+class OvalShape extends Shape {
+    private int x, y, width, height;
+
+    public OvalShape(int x1, int y1, int x2, int y2, Color color, int strokeWidth) {
+        super(color, strokeWidth);
+        this.x = Math.min(x1, x2);
+        this.y = Math.min(y1, y2);
+        this.width = Math.abs(x1 - x2);
+        this.height = Math.abs(y1 - y2);
+    }
+
+    @Override
+    public void draw(Graphics2D g2d) {
+        g2d.setColor(color);
+        g2d.setStroke(new BasicStroke(strokeWidth));
+        g2d.drawOval(x, y, width, height);
+    }
+}
+Plik PaintPanel.java
+
+To nasze cyfrowe płótno. Łapie ruchy myszki, przechowuje listę wszystkich narysowanych figur i zajmuje się ich renderowaniem.
+
+Java
+
+Java
+import javax.swing.*;
+import java.awt.*;
+import java.awt.event.*;
+import java.util.ArrayList;
+import java.util.List;
+
+public class PaintPanel extends JPanel {
+    // Lista do przechowywania historii wszystkich narysowanych obiektów (figur)
+    private List<Shape> shapes = new ArrayList<>(); 
+    
+    // Domyślne ustawienia narzędzia
+    private String currentTool = "Brush"; 
+    private Color currentColor = Color.BLACK;
+    private int currentStroke = 5;
+
+    // Zmienne pomocnicze dla myszy
+    private int lastX, lastY;
+    private int startX, startY;
+    private Shape previewShape = null; // Figura, którą "ciągniemy" do momentu puszczenia przycisku myszy
+
+    public PaintPanel() {
+        setBackground(Color.WHITE); // Początkowo płótno jest czyste i białe
+
+        // Słuchacz kliknięć myszy (MouseListener)
+        addMouseListener(new MouseAdapter() {
+            @Override
+            public void mousePressed(MouseEvent e) {
+                startX = e.getX();
+                startY = e.getY();
+                lastX = startX;
+                lastY = startY;
+            }
+
+            @Override
+            public void mouseReleased(MouseEvent e) {
+                // Przycisk zwolniony — zatwierdzamy figurę na płótnie
+                if (previewShape != null) {
+                    shapes.add(previewShape);
+                    previewShape = null;
+                    repaint();
+                }
+            }
+        });
+
+        // Słuchacz ruchu myszy (MouseMotionListener)
+        addMouseMotionListener(new MouseMotionAdapter() {
+            @Override
+            public void mouseDragged(MouseEvent e) {
+                int currentX = e.getX();
+                int currentY = e.getY();
+
+                // Jeśli wybrana jest gumka, po prostu rysujemy kolorem tła (białym)
+                Color activeColor = currentTool.equals("Eraser") ? Color.WHITE : currentColor;
+
+                switch (currentTool) {
+                    case "Brush":
+                    case "Eraser":
+                        // Swobodne rysowanie to nieprzerwana seria małych linii
+                        shapes.add(new LineShape(lastX, lastY, currentX, currentY, activeColor, currentStroke));
+                        lastX = currentX;
+                        lastY = currentY;
+                        break;
+                    case "Line":
+                        previewShape = new LineShape(startX, startY, currentX, currentY, activeColor, currentStroke);
+                        break;
+                    case "Rect":
+                        previewShape = new RectangleShape(startX, startY, currentX, currentY, activeColor, currentStroke);
+                        break;
+                    case "Oval":
+                        previewShape = new OvalShape(startX, startY, currentX, currentY, activeColor, currentStroke);
+                        break;
+                }
+                repaint(); // Zmuszamy panel do odświeżenia i wywołania paintComponent
+            }
+        });
+    }
+
+    @Override
+    protected void paintComponent(Graphics g) {
+        super.paintComponent(g);
+        Graphics2D g2d = (Graphics2D) g;
+        
+        // Włączamy antyaliasing (wygładzanie), aby rysunki były gładkie i ładne
+        g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+        // Magia POLIMORFIZMU: wywołujemy .draw() na każdej figurze, a one same wiedzą, jak się rysować!
+        for (Shape shape : shapes) {
+            shape.draw(g2d);
+        }
+
+        // Rysujemy podgląd konturu figury, którą aktualnie rozciągamy
+        if (previewShape != null) {
+            previewShape.draw(g2d);
+        }
+    }
+
+    // Metody sterowania dla przycisków interfejsu
+    public void setTool(String tool) { this.currentTool = tool; }
+    public void setColor(Color color) { this.currentColor = color; }
+    public void setStroke(int stroke) { this.currentStroke = stroke; }
+
+    // Czyszczenie płótna
+    public void clearCanvas() {
+        shapes.clear();
+        previewShape = null;
+        repaint();
+    }
+
+    // Odmiana operacji (Undo)
+    public void undo() {
+        if (!shapes.isEmpty()) {
+            shapes.remove(shapes.size() - 1); // Usuwamy ostatnią figurę z listy
+            repaint();
+        }
+    }
+}
+Plik PocketPaint.java
+
+To serce naszego programu. Główna klasa tworząca okno, panel sterowania, przyciski, suwaki, a także zawierająca metodę main do uruchomienia.
+
+Java
+
+Java
+import javax.swing.*;
+import java.awt.*;
+import java.awt.event.*;
+
+public class PocketPaint extends JFrame {
+    private PaintPanel paintPanel;
+
+    public PocketPaint() {
+        // Podstawowe ustawienia okna
+        setTitle("Pocket Paint");
+        setSize(900, 600);
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE); // Bezpieczne zamknięcie przez krzyżyk
+        setLocationRelativeTo(null); // Okno otworzy się na środku ekranu
+
+        // Tworzymy płótno i wrzucamy je na środek
+        paintPanel = new PaintPanel();
+        add(paintPanel, BorderLayout.CENTER);
+
+        // Panel narzędzi (menu na górze)
+        JPanel controlPanel = new JPanel();
+        controlPanel.setLayout(new FlowLayout(FlowLayout.LEFT, 10, 10));
+        controlPanel.setBackground(new Color(240, 240, 240));
+
+        // Lista rozwijana narzędzi
+        String[] tools = {"Brush", "Line", "Rect", "Oval", "Eraser"};
+        JComboBox<String> toolBox = new JComboBox<>(tools);
+        toolBox.addActionListener(e -> paintPanel.setTool((String) toolBox.getSelectedItem())); // ActionListener
+        controlPanel.add(new JLabel("Narzędzie:"));
+        controlPanel.add(toolBox);
+
+        // Suwak rozmiaru pędzla/gumki
+        JSlider strokeSlider = new JSlider(1, 30, 5);
+        strokeSlider.addChangeListener(e -> paintPanel.setStroke(strokeSlider.getValue()));
+        controlPanel.add(new JLabel("Rozmiar:"));
+        controlPanel.add(strokeSlider);
+
+Oto absolutnie cały tekst rozmowy wraz z fragmentami kodu oraz szczegółowymi wyjaśnieniami przetłumaczony na język polski:
+
+Plik PocketPaint.java (Kontynuacja panelu sterowania i punkt wejścia)
+Java
+        // Wybór koloru z palety systemowej
+        JButton colorBtn = new JButton(" Pick Color ");
+        colorBtn.setBackground(Color.BLACK);
+        colorBtn.setForeground(Color.WHITE);
+        colorBtn.addActionListener(e -> {
+            Color selected = JColorChooser.showDialog(this, "Select Paint Color", Color.BLACK); // Okno wyboru koloru
+            if (selected != null) {
+                paintPanel.setColor(selected);
+                colorBtn.setBackground(selected);
+                
+                // Myk: zmieniamy kolor tekstu na przycisku (czarny/biały), aby zawsze był widoczny
+                double luminance = (0.299 * selected.getRed() + 0.587 * selected.getGreen() + 0.114 * selected.getBlue()) / 255;
+                colorBtn.setForeground(luminance > 0.5 ? Color.BLACK : Color.WHITE);
+            }
+        });
+        controlPanel.add(colorBtn);
+
+        // Przycisk Undo (Krok wstecz)
+        JButton undoBtn = new JButton("Undo");
+        undoBtn.addActionListener(e -> paintPanel.undo());
+        controlPanel.add(undoBtn);
+
+        // Przycisk Clear (Wyczyść płótno)
+        JButton clearBtn = new JButton("Clear");
+        clearBtn.addActionListener(e -> paintPanel.clearCanvas());
+        controlPanel.add(clearBtn);
+
+        // Dodajemy panel sterowania na górę okna
+        add(controlPanel, BorderLayout.NORTH);
+
+        // Przypisujemy skrót klawiszowy Ctrl+Z do całego okna (Undo)
+        paintPanel.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).put(
+                KeyStroke.getKeyStroke(KeyEvent.VK_Z, InputEvent.CTRL_DOWN_MASK), "undoAction"
+        );
+        paintPanel.getActionMap().put("undoAction", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                paintPanel.undo();
+            }
+        });
+    }
+
+    // Punkt wejścia do programu
+    public static void main(String[] args) {
+        // Rekomendowane, bezpieczne uruchamianie interfejsów GUI w Swing
+        SwingUtilities.invokeLater(() -> {
+            new PocketPaint().setVisible(true);
+        });
+    }
+}
+Teraz uruchamiaj projekt przez PocketPaint.java (w każdym normalnym IDE będzie tam zielony trójkącik "Run"). Architektura jest czysta, wykładowca to doceni! Pytaj, jeśli coś jest niejasne.
+
+Ja: wyjaśnij mi po kolei każdy fragment kodu
+
+Gemini: Jasne, rozłóżmy cały kod na czynniki pierwsze. W gruncie rzeczy Twoja aplikacja jest zbudowana jak matrioszka: mamy ogólne pojęcie „figury”, mamy konkretne kształty, mamy płótno, które je rysuje, oraz samo okno z przyciskami.
+
+Przejdźmy przez każdy plik, żebyś mogła z łatwością wytłumaczyć wykładowcy, co dokładnie się tutaj dzieje.
+
+1. Plik Shape.java (Abstrakcyjny fundament)
+To najważniejsza klasa pod kątem OOP. Nie możemy stworzyć „po prostu figury”, bo nie wiadomo, jak ona wygląda. Dlatego klasa została oznaczona jako abstract.
+
+Java
+public abstract class Shape {
+    protected Color color;
+    protected int strokeWidth;
+
+    public Shape(Color color, int strokeWidth) {
+        this.color = color;
+        this.strokeWidth = strokeWidth;
+    }
+
+    public abstract void draw(Graphics2D g2d);
+}
+protected Color color i strokeWidth — to pola, w których przechowywane są kolor oraz grubość linii. Modyfikator protected (enkapsulacja) oznacza, że zmienne te są ukryte przed światem zewnętrznym, ale klasy pochodne (linia, koło) mają do nich bezpośredni dostęp.
+
+Konstruktor Shape(...) — kiedy będziemy tworzyć jakąkolwiek figurę, mamy obowiązek przekazać jej kolor i grubość.
+
+public abstract void draw(Graphics2D g2d) — to metoda abstrakcyjna. Nie ma ona ciała (kodu wewnątrz). To po prostu rozkaz dla wszystkich przyszłych figur: „Każdy, kto po mnie dziedziczy, musi napisać swoją metodę draw i wyjaśnić Javie, jak dokładnie ma siebie narysować”.
+
+2. Plik Shapes.java (Konkretne figury)
+Tutaj wykonujemy rozkaz klasy abstrakcyjnej i tworzymy realne obiekty. Wykorzystujemy mechanizm dziedziczenia (extends).
+
+Linia (LineShape)
+Java
+class LineShape extends Shape {
+    private int x1, y1, x2, y2;
+
+    public LineShape(int x1, int y1, int x2, int y2, Color color, int strokeWidth) {
+        super(color, strokeWidth);
+        this.x1 = x1; this.y1 = y1; this.x2 = x2; this.y2 = y2;
+    }
+
+    @Override
+    public void draw(Graphics2D g2d) {
+        g2d.setColor(color);
+        g2d.setStroke(new BasicStroke(strokeWidth, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+        g2d.drawLine(x1, y1, x2, y2);
+    }
+}
+super(color, strokeWidth) — wywołuje konstruktor klasy nadrzędnej Shape, aby przekazać mu wspólne ustawienia.
+
+@Override — adnotacja, która mówi: „Nadpisuję metodę draw z klasy rodzica”.
+
+g2d.setStroke(...) — konfiguruje pędzel. Parametry CAP_ROUND i JOIN_ROUND sprawiają, że końce linii są zaokrąglone. Dzięki temu swobodne rysowanie odręczne wygląda gładko, a nie jak połamane, kwadratowe piksele.
+
+Prostokąt i Owal (RectangleShape i OvalShape)
+W Java Swing funkcje drawRect i drawOval przyjmują na wejściu: x oraz y (lewy górny róg), a także width (szerokość) i height (wysokość). Jednak użytkownik może przeciągać myszkę w dowolną stronę — z lewej na prawą, z prawej na lewą, z dołu do góry.
+
+Żeby kształt się nie psuł i nie znikał, w konstruktorze zastosowano odrobinę matematyki:
+
+Java
+this.x = Math.min(x1, x2); // Znajdujemy punkt najbardziej wysunięty na lewo
+this.y = Math.min(y1, y2); // Znajdujemy punkt najwyższy
+this.width = Math.abs(x1 - x2); // Obliczamy czystą szerokość (wartość bezwzględna)
+this.height = Math.abs(y1 - y2); // Obliczamy czystą wysokość
+3. Plik PaintPanel.java (Nasz płótno)
+To serce programu. Panel (JPanel), na którym dzieje się cała magia.
+
+Przechowywanie danych
+Java
+private List<Shape> shapes = new ArrayList<>(); 
+private String currentTool = "Brush"; 
+private Color currentColor = Color.BLACK;
+private int currentStroke = 5;
+List<Shape> shapes — dynamiczna lista (historia), do której trafiają absolutnie wszystkie narysowane linie i figury. Zwróć uwagę na typ danych: używamy ogólnego Shape, a w środku mogą leżeć zarówno obiekty LineShape, jak i OvalShape.
+
+Pozostałe zmienne przechowują informacje o tym, czym rysujemy w danym momencie (narzędzie, kolor, grubość).
+
+Obsługa myszy (Zdarzenia)
+Java
+addMouseListener(new MouseAdapter() { ... });
+addMouseMotionListener(new MouseMotionAdapter() { ... });
+To są właśnie te asynchroniczne zdarzenia (Event Handling), o które pyta specyfikacja.
+
+mousePressed (kliknięcie przycisku): program zapamiętuje punkt startowy startX i startY.
+
+mouseDragged (przeciąganie z wciśniętym przyciskiem):
+
+Jeśli wybrano Brush lub Eraser, błyskawicznie tworzymy mnóstwo małych linii od starego punktu do nowego i od razu dodajemy je do listy shapes. W ten sposób powstaje ciągły rysunek.
+
+Jeśli wybrano geometrię (Rect, Oval, Line), nie zaśmiecamy listy milionem prostokątów podczas ruchu myszy. Zapisujemy figurę do tymczasowej zmiennej previewShape. Użytkownik widzi kontur, który „rozciąga się” za kursorem.
+
+mouseReleased (puszczenie przycisku): tymczasowa figura previewShape trafia na stałe do głównej listy shapes.
+
+Renderowanie (Polimorfizm w działaniu)
+Java
+@Override
+protected void paintComponent(Graphics g) {
+    super.paintComponent(g);
+    Graphics2D g2d = (Graphics2D) g;
+    
+    for (Shape shape : shapes) {
+        shape.draw(g2d);
+    }
+    ...
+}
+Metoda paintComponent wywołuje się automatycznie za każdym razem, kiedy wywołujemy repaint().
+
+for (Shape shape : shapes) — oto polimorfizm w czystej postaci! Javie jest wszystko jedno, jaki konkretnie kształt został właśnie wyciągnięty z listy. Ona po prostu wywołuje metodę .draw(g2d). Jeśli to koło — odpali się metoda rysująca koło, jeśli linia — ta rysująca linię.
+
+4. Plik PocketPaint.java (Główne okno i przyciski)
+Ta klasa tworzy wizualne okno aplikacji (JFrame).
+
+Konstruktor i panel sterowania
+Java
+public PocketPaint() {
+    setTitle("Pocket Paint");
+    setSize(900, 600);
+    ...
+    JPanel controlPanel = new JPanel();
+Tutaj konfigurujemy wymiary okna i tworzymy controlPanel — szary pasek na górze, na którym umieszczamy wszystkie przyciski.
+
+Komponenty UI (Słuchacze)
+Każdy przycisk czy suwak ma przypisane krótkie wyrażenia lambda (ActionListener i ChangeListener):
+
+toolBox (Wybór narzędzia): przy kliknięciu na listę rozwijaną przekazuje płótnu tekst, na przykład "Eraser".
+
+strokeSlider (Rozmiar pędzla): gdy przesuwasz suwak, zmienia się wartość grubości w PaintPanel.
+
+colorBtn (Paleta): wywołuje świetne, standardowe okno Javy JColorChooser.showDialog. Można tam wybrać dowolny kolor z koła barw.
+
+Funkcja Ctrl+Z (Undo)
+Java
+paintPanel.getInputMap(...).put(KeyStroke.getKeyStroke(KeyEvent.VK_Z, InputEvent.CTRL_DOWN_MASK), "undoAction");
+Na samym końcu konstruktora przypisujemy skrót klawiszowy do naszej aplikacji. Kiedy Java wykryje naciśnięcie Ctrl + Z, uruchamia metodę paintPanel.undo(), która po prostu usuwa ostatni element z listy shapes i odświeża ekran.
+
+I to wszystko! Kod jest logiczny, podzielony według odpowiedzialności klas i w pełni realizuje wszystkie założenia Twojego projektu.
